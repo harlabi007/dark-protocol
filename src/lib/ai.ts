@@ -15,16 +15,15 @@ export async function scoreDataset(
   fileName: string,
   fileSize: number
 ): Promise<QualityScore> {
-  console.log("scoring...");
-
   const key = import.meta.env.VITE_ANTHROPIC_API_KEY;
-  console.log("key starts with:", key?.slice(0, 10));
 
-  const response = await fetch("/api/score", {
+  const response = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
+      "x-api-key": key,
       "anthropic-version": "2023-06-01",
+      "anthropic-dangerous-direct-browser-access": "true",
     },
     body: JSON.stringify({
       model: "claude-haiku-4-5-20251001",
@@ -38,7 +37,7 @@ Title: ${title}
 Description: ${description}
 File: ${fileName} (${(fileSize / 1024).toFixed(1)} KB)
 
-Return exactly this JSON structure:
+Return exactly this JSON:
 {
   "overall": 8,
   "completeness": 8,
@@ -56,8 +55,7 @@ Return exactly this JSON structure:
 
   if (!response.ok) {
     const err = await response.text();
-    console.error("API error:", response.status, err);
-    throw new Error(`API error ${response.status}`);
+    throw new Error(`API error ${response.status}: ${err}`);
   }
 
   const data = await response.json();

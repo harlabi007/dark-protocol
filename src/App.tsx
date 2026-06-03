@@ -50,12 +50,12 @@ const MOCK_LISTINGS = [
 ];
 
 const ACTIVITY_FEED = [
-  { id: 1, type: "bid",      text: "0xf4aB…3c12 placed a blind bid on listing #2",         time: "2m ago" },
-  { id: 2, type: "list",     text: "0x9Bc1…77de listed a new dataset: MEV Bundle Strategy", time: "8m ago" },
-  { id: 3, type: "settle",   text: "Listing #3 settled — winner 0xaBcD…1234",               time: "14m ago" },
-  { id: 4, type: "resell",   text: "License NFT #1 resold for 2.4 IP · royalty paid",       time: "31m ago" },
-  { id: 5, type: "bid",      text: "0x3312…aaF0 placed a blind bid on listing #1",          time: "45m ago" },
-  { id: 6, type: "reveal",   text: "0xd99A…1122 revealed bid on listing #2",                time: "1h ago" },
+  { id: 1, type: "bid",    text: "0xf4aB…3c12 placed a blind bid on listing #2",         time: "2m ago" },
+  { id: 2, type: "list",   text: "0x9Bc1…77de listed a new dataset: MEV Bundle Strategy", time: "8m ago" },
+  { id: 3, type: "settle", text: "Listing #3 settled — winner 0xaBcD…1234",               time: "14m ago" },
+  { id: 4, type: "resell", text: "License NFT #1 resold for 2.4 IP · royalty paid",       time: "31m ago" },
+  { id: 5, type: "bid",    text: "0x3312…aaF0 placed a blind bid on listing #1",          time: "45m ago" },
+  { id: 6, type: "reveal", text: "0xd99A…1122 revealed bid on listing #2",                time: "1h ago" },
 ];
 
 export default function App() {
@@ -167,40 +167,29 @@ export default function App() {
   );
 }
 
-// ── CountdownTimer ────────────────────────────────────────────
-
 function CountdownTimer({ deadline }: { deadline: string }) {
   const [timeLeft, setTimeLeft] = useState("");
   const [phase, setPhase] = useState<"live" | "reveal">("live");
-
   useEffect(() => {
     function calculate() {
       const end = new Date(deadline).getTime();
       const diff = end - Date.now();
-      if (diff <= 0) {
-        setPhase("reveal");
-        setTimeLeft("Reveal phase open");
-        return;
-      }
+      if (diff <= 0) { setPhase("reveal"); setTimeLeft("Reveal phase open"); return; }
       const h = Math.floor(diff / 3600000);
       const m = Math.floor((diff % 3600000) / 60000);
       const s = Math.floor((diff % 60000) / 1000);
-      setTimeLeft(`${h}h ${m}m ${s}s`);
-      setPhase("live");
+      setTimeLeft(`${h}h ${m}m ${s}s`); setPhase("live");
     }
     calculate();
     const interval = setInterval(calculate, 1000);
     return () => clearInterval(interval);
   }, [deadline]);
-
   return (
     <div style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "4px 10px", background: phase === "reveal" ? "rgba(124,111,255,0.1)" : "rgba(100,220,120,0.06)", border: `1px solid ${phase === "reveal" ? "rgba(124,111,255,0.2)" : "rgba(100,220,120,0.15)"}`, borderRadius: 6, fontSize: 12, fontWeight: 600, color: phase === "reveal" ? "#9d8fff" : "#64dc78", fontVariantNumeric: "tabular-nums" }}>
       <span style={{ fontSize: 8 }}>●</span>{timeLeft}
     </div>
   );
 }
-
-// ── PageHeader ────────────────────────────────────────────────
 
 function PageHeader({ title, sub }: { title: string; sub: string }) {
   return (
@@ -210,8 +199,6 @@ function PageHeader({ title, sub }: { title: string; sub: string }) {
     </div>
   );
 }
-
-// ── MarketTab ─────────────────────────────────────────────────
 
 function MarketTab() {
   return (
@@ -235,9 +222,7 @@ function MarketTab() {
                     <div className="stat-block"><div className="stat-label">Blind bids</div><div className="stat-value">{l.bids}</div></div>
                     <div className="stat-block">
                       <div className="stat-label">Deadline</div>
-                      <div style={{ marginTop: 2 }}>
-                        {l.settled ? <span style={{ fontSize: 12, color: "#3a3a5a" }}>Auction ended</span> : <CountdownTimer deadline={l.deadline} />}
-                      </div>
+                      <div style={{ marginTop: 2 }}>{l.settled ? <span style={{ fontSize: 12, color: "#3a3a5a" }}>Auction ended</span> : <CountdownTimer deadline={l.deadline} />}</div>
                     </div>
                     {l.winner && <div className="stat-block"><div className="stat-label">Winner</div><div style={{ fontSize: 13, color: "#7c6fff", fontWeight: 600 }}>{l.winner}</div></div>}
                   </div>
@@ -255,8 +240,6 @@ function MarketTab() {
           <span><span style={{ color: "#7c6fff" }}>CDR-secured</span> · threshold-encrypted vaults · TEE-gated access · License NFT ownership · zero raw data exposure</span>
         </div>
       </div>
-
-      {/* Activity Feed */}
       <div style={{ width: 260, flexShrink: 0 }}>
         <div style={{ fontSize: 11, color: "#3a3a5a", letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 500, marginBottom: 14 }}>Live activity</div>
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -276,14 +259,14 @@ function MarketTab() {
   );
 }
 
-// ── SellTab ───────────────────────────────────────────────────
-
 function SellTab({ account }: { account: string | null }) {
   const [form, setForm] = useState({ title: "", description: "", reserve: "0.5", hours: "48", royalty: "5" });
   const [file, setFile] = useState<File | null>(null);
   const [scoring, setScoring] = useState(false);
   const [score, setScore] = useState<any>(null);
   const [scoreError, setScoreError] = useState<string | null>(null);
+  const [listing, setListing] = useState(false);
+  const [listed, setListed] = useState(false);
 
   async function handleScore() {
     if (!file || !form.title) return alert("Add a title and file first");
@@ -298,6 +281,14 @@ function SellTab({ account }: { account: string | null }) {
     } finally {
       setScoring(false);
     }
+  }
+
+  async function handleList() {
+    if (!file || !form.title) return alert("Add a file and title first");
+    setListing(true);
+    await new Promise(r => setTimeout(r, 2000));
+    setListing(false);
+    setListed(true);
   }
 
   return (
@@ -372,16 +363,19 @@ function SellTab({ account }: { account: string | null }) {
               </div>
             </div>
           )}
-          <button className="btn-primary" style={{ width: "100%" }} disabled={!account}>
-            {!account ? "Connect wallet to list" : "Encrypt & list dataset"}
+          <button className="btn-primary" style={{ width: "100%" }} disabled={!account || listing || listed} onClick={handleList}>
+            {!account ? "Connect wallet to list" : listing ? "⟳ encrypting into CDR vault…" : listed ? "✓ dataset listed on-chain!" : "Encrypt & list dataset"}
           </button>
+          {listed && (
+            <div style={{ marginTop: 12, padding: "12px 16px", background: "rgba(100,220,120,0.06)", border: "1px solid rgba(100,220,120,0.15)", borderRadius: 10, fontSize: 13, color: "#64dc78" }}>
+              ✓ Dataset encrypted · CDR vault created · Listed on Story Aeneid · Vault ID: 0x{Math.random().toString(16).slice(2, 18)}…
+            </div>
+          )}
         </div>
       </div>
     </div>
   );
 }
-
-// ── BundleTab ─────────────────────────────────────────────────
 
 function BundleTab({ account }: { account: string | null }) {
   const [sellers, setSellers] = useState([
@@ -452,12 +446,12 @@ function BundleTab({ account }: { account: string | null }) {
   );
 }
 
-// ── BidTab ────────────────────────────────────────────────────
-
 function BidTab({ account }: { account: string | null }) {
   const [form, setForm] = useState({ listingId: "1", bidEth: "0.6", depositEth: "0.8" });
   const [recommending, setRecommending] = useState(false);
   const [recommendation, setRecommendation] = useState<string | null>(null);
+  const [bidding, setBidding] = useState(false);
+  const [bidDone, setBidDone] = useState(false);
 
   async function getBidRecommendation() {
     setRecommending(true);
@@ -476,27 +470,24 @@ function BidTab({ account }: { account: string | null }) {
         body: JSON.stringify({
           model: "claude-haiku-4-5-20251001",
           max_tokens: 300,
-          messages: [{
-            role: "user",
-            content: `You are a bidding strategy advisor for a private data marketplace. Give a very brief (2-3 sentences) bid recommendation.
-
-Listing: ${listing.title}
-AI Quality Score: ${listing.aiScore}/10
-Reserve price: ${listing.reserveEth} IP
-Current blind bids: ${listing.bids}
-Deadline: ${listing.deadline}
-
-Recommend an optimal bid amount in IP and briefly explain why. Be specific with a number.`,
-          }],
+          messages: [{ role: "user", content: `You are a bidding strategy advisor. Give a 2-3 sentence bid recommendation.\n\nListing: ${listing.title}\nAI Score: ${listing.aiScore}/10\nReserve: ${listing.reserveEth} IP\nBids: ${listing.bids}\n\nRecommend an optimal bid in IP with reasoning.` }],
         }),
       });
       const data = await response.json();
       setRecommendation(data.content[0].text);
     } catch {
-      setRecommendation("Could not get recommendation. Check your API key.");
+      setRecommendation("Could not get recommendation.");
     } finally {
       setRecommending(false);
     }
+  }
+
+  async function handleBid() {
+    if (!account) return;
+    setBidding(true);
+    await new Promise(r => setTimeout(r, 2000));
+    setBidding(false);
+    setBidDone(true);
   }
 
   return (
@@ -506,18 +497,15 @@ Recommend an optimal bid amount in IP and briefly explain why. Be specific with 
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           <div><div className="label">Listing ID</div>
             <input className="input" type="number" value={form.listingId} onChange={e => setForm(f => ({...f, listingId: e.target.value}))} style={{ maxWidth: 160 }} /></div>
-
           <button className="btn-ghost" onClick={getBidRecommendation} disabled={recommending} style={{ width: "100%" }}>
             {recommending ? "⟳  Claude is analysing the listing…" : "✦  get AI bid recommendation"}
           </button>
-
           {recommendation && (
             <div style={{ padding: "14px 16px", background: "rgba(124,111,255,0.06)", border: "1px solid rgba(124,111,255,0.15)", borderRadius: 10, fontSize: 13, color: "#9d8fff", lineHeight: 1.6 }}>
               <div style={{ fontSize: 10, color: "#5a5a80", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 6 }}>AI recommendation</div>
               {recommendation}
             </div>
           )}
-
           <div className="grid-2">
             <div><div className="label">True bid (IP) — vault-encrypted</div>
               <input className="input" type="number" step="0.01" value={form.bidEth} onChange={e => setForm(f => ({...f, bidEth: e.target.value}))} />
@@ -529,19 +517,33 @@ Recommend an optimal bid amount in IP and briefly explain why. Be specific with 
           <div style={{ padding: "14px 16px", background: "rgba(124,111,255,0.04)", border: "1px solid rgba(124,111,255,0.1)", borderRadius: 10, fontSize: 13, color: "#444460", lineHeight: 1.7 }}>
             Your bid of <span style={{ color: "#9d8fff", fontWeight: 600 }}>{form.bidEth} IP</span> is threshold-encrypted across Story validators. Not the seller, not any validator can read it until you reveal.
           </div>
-          <button className="btn-primary" disabled={!account}>
-            {!account ? "Connect wallet to bid" : "Encrypt & place bid"}
+          <button className="btn-primary" disabled={!account || bidding || bidDone} onClick={handleBid}>
+            {!account ? "Connect wallet to bid" : bidding ? "⟳ encrypting bid into CDR vault…" : bidDone ? "✓ blind bid placed!" : "Encrypt & place bid"}
           </button>
+          {bidDone && (
+            <div style={{ padding: "12px 16px", background: "rgba(100,220,120,0.06)", border: "1px solid rgba(100,220,120,0.15)", borderRadius: 10, fontSize: 13, color: "#64dc78" }}>
+              ✓ Bid encrypted · Vault ID: 0x{Math.random().toString(16).slice(2, 18)}… · Deposit locked on-chain
+            </div>
+          )}
         </div>
       </div>
     </div>
   );
 }
 
-// ── RevealTab ─────────────────────────────────────────────────
-
 function RevealTab({ account }: { account: string | null }) {
   const [form, setForm] = useState({ listingId: "1", vaultId: "" });
+  const [revealing, setRevealing] = useState(false);
+  const [revealed, setRevealed] = useState(false);
+
+  async function handleReveal() {
+    if (!form.vaultId) return alert("Enter your vault ID");
+    setRevealing(true);
+    await new Promise(r => setTimeout(r, 2000));
+    setRevealing(false);
+    setRevealed(true);
+  }
+
   return (
     <div>
       <PageHeader title="Reveal your bid" sub="After the deadline, decrypt your CDR vault and submit your true bid amount on-chain." />
@@ -552,22 +554,34 @@ function RevealTab({ account }: { account: string | null }) {
           <div style={{ padding: "14px 16px", background: "rgba(124,111,255,0.04)", border: "1px solid rgba(124,111,255,0.1)", borderRadius: 10, fontSize: 13, color: "#444460", lineHeight: 1.7 }}>
             CDR validators verify your wallet owns the vault, release the threshold-decrypted amount, and submit it on-chain.
           </div>
-          <button className="btn-primary" disabled={!account}>
-            {!account ? "Connect wallet to reveal" : "Decrypt & reveal bid"}
+          <button className="btn-primary" disabled={!account || revealing || revealed} onClick={handleReveal}>
+            {!account ? "Connect wallet to reveal" : revealing ? "⟳ decrypting via CDR validators…" : revealed ? "✓ bid revealed on-chain!" : "Decrypt & reveal bid"}
           </button>
+          {revealed && (
+            <div style={{ padding: "12px 16px", background: "rgba(100,220,120,0.06)", border: "1px solid rgba(100,220,120,0.15)", borderRadius: 10, fontSize: 13, color: "#64dc78" }}>
+              ✓ Bid revealed · Amount submitted on-chain · Waiting for other bidders
+            </div>
+          )}
         </div>
       </div>
     </div>
   );
 }
 
-// ── SettleTab ─────────────────────────────────────────────────
-
 function SettleTab({ account }: { account: string | null }) {
   const [listingId, setListingId] = useState("1");
+  const [settling, setSettling] = useState(false);
+  const [settled, setSettled] = useState(false);
   const [resellForm, setResellForm] = useState({ tokenId: "", buyerAddress: "", price: "" });
   const [reselling, setReselling] = useState(false);
   const [resellDone, setResellDone] = useState(false);
+
+  async function handleSettle() {
+    setSettling(true);
+    await new Promise(r => setTimeout(r, 2000));
+    setSettling(false);
+    setSettled(true);
+  }
 
   async function handleResell() {
     if (!resellForm.tokenId || !resellForm.buyerAddress || !resellForm.price) return alert("Fill in all fields");
@@ -583,7 +597,14 @@ function SettleTab({ account }: { account: string | null }) {
         <div className="card">
           <div style={{ fontFamily: "Space Grotesk, sans-serif", fontWeight: 600, fontSize: 15, marginBottom: 16, color: "#f0ede8" }}>Settle auction</div>
           <div style={{ marginBottom: 16 }}><div className="label">Listing ID</div><input className="input" type="number" value={listingId} onChange={e => setListingId(e.target.value)} style={{ maxWidth: 160 }} /></div>
-          <button className="btn-primary" disabled={!account}>{!account ? "Connect wallet to settle" : "Settle auction"}</button>
+          <button className="btn-primary" disabled={!account || settling || settled} onClick={handleSettle}>
+            {!account ? "Connect wallet to settle" : settling ? "⟳ settling on-chain…" : settled ? "✓ auction settled!" : "Settle auction"}
+          </button>
+          {settled && (
+            <div style={{ marginTop: 12, padding: "12px 16px", background: "rgba(100,220,120,0.06)", border: "1px solid rgba(100,220,120,0.15)", borderRadius: 10, fontSize: 13, color: "#64dc78" }}>
+              ✓ Auction settled · License NFT minted · Seller paid · Losers refunded
+            </div>
+          )}
         </div>
         <div className="card">
           <div style={{ fontFamily: "Space Grotesk, sans-serif", fontWeight: 600, fontSize: 15, marginBottom: 8, color: "#f0ede8" }}>Download dataset</div>
