@@ -54,7 +54,8 @@ export async function listDataset(
   vaultId: string,
   metadataURI: string,
   reserveEth: string,
-  durationHours: number
+  durationHours: number,
+  royaltyBps: number = 500
 ) {
   await switchToAeneid();
   const wallet = getWalletClient();
@@ -70,6 +71,7 @@ export async function listDataset(
   metadataURI,
   parseEther(reserveEth),
   BigInt(durationHours * 3600),
+  BigInt(royaltyBps),
 ],
     account,
     chain: STORY_AENEID,
