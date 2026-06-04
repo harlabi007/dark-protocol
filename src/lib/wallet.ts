@@ -67,12 +67,12 @@ export async function listDataset(
     abi: DARKPOOL_ABI,
     functionName: "list",
     args: [
-  vaultId as `0x${string}`,
-  metadataURI,
-  parseEther(reserveEth),
-  BigInt(durationHours * 3600),
-  BigInt(royaltyBps),
-],
+      vaultId as `0x${string}`,
+      metadataURI,
+      parseEther(reserveEth),
+      BigInt(durationHours * 3600),
+      BigInt(royaltyBps),
+    ] as [`0x${string}`, string, bigint, bigint, bigint],
     account,
     chain: STORY_AENEID,
   });
