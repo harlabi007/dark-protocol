@@ -72,7 +72,7 @@ export async function listDataset(
       parseEther(reserveEth),
       BigInt(durationHours * 3600),
       BigInt(royaltyBps),
-    ] as [`0x${string}`, string, bigint, bigint, bigint],
+    ],
     account,
     chain: STORY_AENEID,
   });
