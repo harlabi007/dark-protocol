@@ -20,6 +20,7 @@ export const DARKPOOL_ABI = [
       { name: "metadataURI", type: "string" },
       { name: "reservePrice", type: "uint256" },
       { name: "duration", type: "uint256" },
+      { name: "royaltyBps", type: "uint256" },
     ],
     outputs: [{ name: "listingId", type: "uint256" }],
   },
@@ -87,4 +88,4 @@ export const DARKPOOL_ABI = [
     inputs: [{ name: "listingId", type: "uint256" }],
     outputs: [{ name: "", type: "uint256" }],
   },
-] as const;
+];
