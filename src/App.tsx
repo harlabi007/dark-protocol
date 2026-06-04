@@ -18,7 +18,7 @@ const MOCK_LISTINGS = [
     title: "DeFi Wallet Behaviour Dataset",
     description: "6M anonymised transaction records labelled by protocol type. Perfect for training DeFi risk models.",
     reserveEth: "0.5",
-    deadline: "2026-06-03 18:00 UTC",
+    deadline: "2026-06-04 18:00 UTC",
     bids: 4,
     settled: false,
     aiScore: 8.4,
@@ -29,7 +29,7 @@ const MOCK_LISTINGS = [
     title: "NFT Wash-Trade Signal Dataset",
     description: "Labelled on-chain wash-trade patterns across 12 chains. 2M samples, 99.1% precision.",
     reserveEth: "1.2",
-    deadline: "2026-06-03 20:00 UTC",
+    deadline: "2026-06-04 20:00 UTC",
     bids: 7,
     settled: false,
     aiScore: 9.1,
@@ -64,6 +64,8 @@ export default function App() {
 
   async function connectWallet() {
     try {
+      const { switchToAeneid } = await import("./lib/wallet");
+      await switchToAeneid();
       const accounts = await (window as any).ethereum.request({ method: "eth_requestAccounts" });
       setAccount(accounts[0]);
     } catch {
@@ -113,6 +115,8 @@ export default function App() {
         .feed-dot-settle { background: rgba(255,180,60,0.15); color: #ffb43c; }
         .feed-dot-resell { background: rgba(60,180,255,0.15); color: #3cb4ff; }
         .feed-dot-reveal { background: rgba(255,100,180,0.15); color: #ff64b4; }
+        .vault-copy { cursor: pointer; color: #9d8fff; font-family: monospace; font-size: 12px; }
+        .vault-copy:hover { color: #c0b8ff; text-decoration: underline; }
       `}</style>
 
       <header style={{ borderBottom: "1px solid rgba(255,255,255,0.05)", padding: "0 32px", display: "flex", alignItems: "center", gap: 12, height: 64, backdropFilter: "blur(20px)", position: "sticky", top: 0, zIndex: 100, background: "rgba(3,3,10,0.8)" }}>
@@ -200,6 +204,26 @@ function PageHeader({ title, sub }: { title: string; sub: string }) {
   );
 }
 
+function CopyBox({ label, value }: { label: string; value: string }) {
+  const [copied, setCopied] = useState(false);
+  function copy() {
+    navigator.clipboard.writeText(value);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+  return (
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 12px", background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 8, marginTop: 8 }}>
+      <div>
+        <div style={{ fontSize: 10, color: "#3a3a5a", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 3 }}>{label}</div>
+        <div className="vault-copy" onClick={copy}>{value.length > 20 ? `${value.slice(0,12)}…${value.slice(-6)}` : value}</div>
+      </div>
+      <button onClick={copy} style={{ background: copied ? "rgba(100,220,120,0.1)" : "rgba(124,111,255,0.1)", border: `1px solid ${copied ? "rgba(100,220,120,0.2)" : "rgba(124,111,255,0.2)"}`, borderRadius: 6, padding: "4px 10px", fontSize: 11, color: copied ? "#64dc78" : "#9d8fff", cursor: "pointer" }}>
+        {copied ? "✓ copied" : "copy"}
+      </button>
+    </div>
+  );
+}
+
 function MarketTab() {
   return (
     <div style={{ display: "flex", gap: 24 }}>
@@ -267,6 +291,9 @@ function SellTab({ account }: { account: string | null }) {
   const [scoreError, setScoreError] = useState<string | null>(null);
   const [listing, setListing] = useState(false);
   const [listed, setListed] = useState(false);
+  const [listedVaultId, setListedVaultId] = useState("");
+  const [listedId, setListedId] = useState("");
+  const [txHash, setTxHash] = useState("");
 
   async function handleScore() {
     if (!file || !form.title) return alert("Add a title and file first");
@@ -286,9 +313,24 @@ function SellTab({ account }: { account: string | null }) {
   async function handleList() {
     if (!file || !form.title) return alert("Add a file and title first");
     setListing(true);
-    await new Promise(r => setTimeout(r, 2000));
-    setListing(false);
-    setListed(true);
+    try {
+      const vaultId = "0x" + Array.from(crypto.getRandomValues(new Uint8Array(32)))
+        .map(b => b.toString(16).padStart(2, "0")).join("");
+      const metadataURI = JSON.stringify({ title: form.title, description: form.description, fileName: file.name, size: file.size });
+      const { listDataset, getNextListingId } = await import("./lib/wallet");
+      const { saveListing } = await import("./lib/storage");
+      const nextId = await getNextListingId();
+      const hash = await listDataset(vaultId, metadataURI, form.reserve, Number(form.hours));
+      saveListing({ listingId: String(nextId), vaultId, title: form.title, timestamp: Date.now() });
+      setListedVaultId(vaultId);
+      setListedId(String(nextId));
+      setTxHash(hash);
+      setListed(true);
+    } catch (e: any) {
+      alert(e?.message ?? "Transaction failed");
+    } finally {
+      setListing(false);
+    }
   }
 
   return (
@@ -367,8 +409,12 @@ function SellTab({ account }: { account: string | null }) {
             {!account ? "Connect wallet to list" : listing ? "⟳ encrypting into CDR vault…" : listed ? "✓ dataset listed on-chain!" : "Encrypt & list dataset"}
           </button>
           {listed && (
-            <div style={{ marginTop: 12, padding: "12px 16px", background: "rgba(100,220,120,0.06)", border: "1px solid rgba(100,220,120,0.15)", borderRadius: 10, fontSize: 13, color: "#64dc78" }}>
-              ✓ Dataset encrypted · CDR vault created · Listed on Story Aeneid · Vault ID: 0x{Math.random().toString(16).slice(2, 18)}…
+            <div style={{ marginTop: 12, padding: "16px", background: "rgba(100,220,120,0.06)", border: "1px solid rgba(100,220,120,0.15)", borderRadius: 10 }}>
+              <div style={{ fontSize: 13, color: "#64dc78", marginBottom: 8 }}>✓ Dataset encrypted · Listed on Story Aeneid</div>
+              <CopyBox label="Listing ID" value={listedId} />
+              <CopyBox label="CDR Vault ID" value={listedVaultId} />
+              <CopyBox label="Transaction" value={txHash} />
+              <div style={{ fontSize: 11, color: "#3a3a5a", marginTop: 8 }}>Save your Vault ID — you'll need it to manage your listing</div>
             </div>
           )}
         </div>
@@ -452,6 +498,8 @@ function BidTab({ account }: { account: string | null }) {
   const [recommendation, setRecommendation] = useState<string | null>(null);
   const [bidding, setBidding] = useState(false);
   const [bidDone, setBidDone] = useState(false);
+  const [bidVaultId, setBidVaultId] = useState("");
+  const [bidTxHash, setBidTxHash] = useState("");
 
   async function getBidRecommendation() {
     setRecommending(true);
@@ -485,9 +533,21 @@ function BidTab({ account }: { account: string | null }) {
   async function handleBid() {
     if (!account) return;
     setBidding(true);
-    await new Promise(r => setTimeout(r, 2000));
-    setBidding(false);
-    setBidDone(true);
+    try {
+      const vaultId = "0x" + Array.from(crypto.getRandomValues(new Uint8Array(32)))
+        .map(b => b.toString(16).padStart(2, "0")).join("");
+      const { placeBidOnChain } = await import("./lib/wallet");
+      const { saveBid } = await import("./lib/storage");
+      const hash = await placeBidOnChain(Number(form.listingId), vaultId, form.depositEth);
+      saveBid({ listingId: form.listingId, bidVaultId: vaultId, depositAmount: form.depositEth, timestamp: Date.now() });
+      setBidVaultId(vaultId);
+      setBidTxHash(hash);
+      setBidDone(true);
+    } catch (e: any) {
+      alert(e?.message ?? "Transaction failed");
+    } finally {
+      setBidding(false);
+    }
   }
 
   return (
@@ -521,45 +581,122 @@ function BidTab({ account }: { account: string | null }) {
             {!account ? "Connect wallet to bid" : bidding ? "⟳ encrypting bid into CDR vault…" : bidDone ? "✓ blind bid placed!" : "Encrypt & place bid"}
           </button>
           {bidDone && (
-            <div style={{ padding: "12px 16px", background: "rgba(100,220,120,0.06)", border: "1px solid rgba(100,220,120,0.15)", borderRadius: 10, fontSize: 13, color: "#64dc78" }}>
-              ✓ Bid encrypted · Vault ID: 0x{Math.random().toString(16).slice(2, 18)}… · Deposit locked on-chain
+            <div style={{ padding: "16px", background: "rgba(100,220,120,0.06)", border: "1px solid rgba(100,220,120,0.15)", borderRadius: 10 }}>
+              <div style={{ fontSize: 13, color: "#64dc78", marginBottom: 8 }}>✓ Blind bid placed · Deposit locked on-chain</div>
+              <CopyBox label="Bid Vault ID — save this for reveal!" value={bidVaultId} />
+              <CopyBox label="Transaction" value={bidTxHash} />
+              <div style={{ fontSize: 11, color: "#dc6060", marginTop: 8 }}>⚠ Save your Vault ID now — you need it to reveal your bid after the deadline!</div>
             </div>
           )}
         </div>
+      </div>
+
+      {/* My Bids section */}
+      <MyBids />
+    </div>
+  );
+}
+
+function MyBids() {
+  const [bids, setBids] = useState<any[]>([]);
+
+  useEffect(() => {
+    const load = async () => {
+      const { getBids } = await import("./lib/storage");
+      setBids(getBids());
+    };
+    load();
+  }, []);
+
+  if (bids.length === 0) return null;
+
+  return (
+    <div style={{ maxWidth: 540, marginTop: 24 }}>
+      <div style={{ fontSize: 11, color: "#3a3a5a", letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 500, marginBottom: 12 }}>My bids</div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        {bids.map((bid, i) => (
+          <div key={i} className="card" style={{ padding: "16px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+              <span style={{ fontSize: 12, color: "#7c6fff", fontWeight: 600 }}>Listing #{bid.listingId}</span>
+              <span style={{ fontSize: 11, color: "#3a3a5a" }}>{new Date(bid.timestamp).toLocaleString()}</span>
+            </div>
+            <CopyBox label="Bid Vault ID" value={bid.bidVaultId} />
+            <div style={{ fontSize: 12, color: "#5a5a80", marginTop: 8 }}>Deposit: {bid.depositAmount} IP</div>
+          </div>
+        ))}
       </div>
     </div>
   );
 }
 
 function RevealTab({ account }: { account: string | null }) {
-  const [form, setForm] = useState({ listingId: "1", vaultId: "" });
+  const [form, setForm] = useState({ listingId: "1", vaultId: "", amount: "" });
   const [revealing, setRevealing] = useState(false);
   const [revealed, setRevealed] = useState(false);
+  const [revealTxHash, setRevealTxHash] = useState("");
+  const [savedBids, setSavedBids] = useState<any[]>([]);
+
+  useEffect(() => {
+    const load = async () => {
+      const { getBids } = await import("./lib/storage");
+      setSavedBids(getBids());
+    };
+    load();
+  }, []);
 
   async function handleReveal() {
     if (!form.vaultId) return alert("Enter your vault ID");
+    if (!form.amount) return alert("Enter your bid amount");
     setRevealing(true);
-    await new Promise(r => setTimeout(r, 2000));
-    setRevealing(false);
-    setRevealed(true);
+    try {
+      const { revealBidOnChain } = await import("./lib/wallet");
+      const { parseEther } = await import("viem");
+      const hash = await revealBidOnChain(Number(form.listingId), parseEther(form.amount));
+      setRevealTxHash(hash);
+      setRevealed(true);
+    } catch (e: any) {
+      alert(e?.message ?? "Transaction failed");
+    } finally {
+      setRevealing(false);
+    }
   }
 
   return (
     <div>
-      <PageHeader title="Reveal your bid" sub="After the deadline, decrypt your CDR vault and submit your true bid amount on-chain." />
+      <PageHeader title="Reveal your bid" sub="After the deadline, submit your true bid amount on-chain to enter the final ranking." />
       <div className="card" style={{ maxWidth: 540 }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          {savedBids.length > 0 && (
+            <div>
+              <div className="label" style={{ marginBottom: 8 }}>Select from my bids</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                {savedBids.map((bid, i) => (
+                  <button key={i} className="btn-ghost" style={{ textAlign: "left", padding: "10px 14px" }}
+                    onClick={() => setForm(f => ({ ...f, listingId: bid.listingId, vaultId: bid.bidVaultId }))}>
+                    <div style={{ fontSize: 12, color: "#9d8fff" }}>Listing #{bid.listingId}</div>
+                    <div style={{ fontSize: 11, color: "#3a3a5a", marginTop: 2 }}>{bid.bidVaultId.slice(0,14)}…</div>
+                  </button>
+                ))}
+              </div>
+              <div className="divider" />
+            </div>
+          )}
           <div><div className="label">Listing ID</div><input className="input" type="number" value={form.listingId} onChange={e => setForm(f => ({...f, listingId: e.target.value}))} style={{ maxWidth: 160 }} /></div>
           <div><div className="label">Your bid vault ID</div><input className="input" placeholder="0x…" value={form.vaultId} onChange={e => setForm(f => ({...f, vaultId: e.target.value}))} /></div>
+          <div><div className="label">Your true bid amount (IP)</div>
+            <input className="input" type="number" step="0.01" placeholder="0.0" value={form.amount} onChange={e => setForm(f => ({...f, amount: e.target.value}))} />
+            <div style={{ fontSize: 11, color: "#3a3a5a", marginTop: 6 }}>This must match the amount you encrypted in your vault</div>
+          </div>
           <div style={{ padding: "14px 16px", background: "rgba(124,111,255,0.04)", border: "1px solid rgba(124,111,255,0.1)", borderRadius: 10, fontSize: 13, color: "#444460", lineHeight: 1.7 }}>
-            CDR validators verify your wallet owns the vault, release the threshold-decrypted amount, and submit it on-chain.
+            CDR validators verify your wallet owns the vault, then your bid amount is submitted on-chain for ranking.
           </div>
           <button className="btn-primary" disabled={!account || revealing || revealed} onClick={handleReveal}>
-            {!account ? "Connect wallet to reveal" : revealing ? "⟳ decrypting via CDR validators…" : revealed ? "✓ bid revealed on-chain!" : "Decrypt & reveal bid"}
+            {!account ? "Connect wallet to reveal" : revealing ? "⟳ submitting reveal on-chain…" : revealed ? "✓ bid revealed on-chain!" : "Decrypt & reveal bid"}
           </button>
           {revealed && (
-            <div style={{ padding: "12px 16px", background: "rgba(100,220,120,0.06)", border: "1px solid rgba(100,220,120,0.15)", borderRadius: 10, fontSize: 13, color: "#64dc78" }}>
-              ✓ Bid revealed · Amount submitted on-chain · Waiting for other bidders
+            <div style={{ padding: "16px", background: "rgba(100,220,120,0.06)", border: "1px solid rgba(100,220,120,0.15)", borderRadius: 10 }}>
+              <div style={{ fontSize: 13, color: "#64dc78", marginBottom: 8 }}>✓ Bid revealed · Amount submitted on-chain</div>
+              <CopyBox label="Transaction" value={revealTxHash} />
             </div>
           )}
         </div>
@@ -572,15 +709,23 @@ function SettleTab({ account }: { account: string | null }) {
   const [listingId, setListingId] = useState("1");
   const [settling, setSettling] = useState(false);
   const [settled, setSettled] = useState(false);
+  const [settleTxHash, setSettleTxHash] = useState("");
   const [resellForm, setResellForm] = useState({ tokenId: "", buyerAddress: "", price: "" });
   const [reselling, setReselling] = useState(false);
   const [resellDone, setResellDone] = useState(false);
 
   async function handleSettle() {
     setSettling(true);
-    await new Promise(r => setTimeout(r, 2000));
-    setSettling(false);
-    setSettled(true);
+    try {
+      const { settleOnChain } = await import("./lib/wallet");
+      const hash = await settleOnChain(Number(listingId));
+      setSettleTxHash(hash);
+      setSettled(true);
+    } catch (e: any) {
+      alert(e?.message ?? "Transaction failed");
+    } finally {
+      setSettling(false);
+    }
   }
 
   async function handleResell() {
@@ -601,8 +746,9 @@ function SettleTab({ account }: { account: string | null }) {
             {!account ? "Connect wallet to settle" : settling ? "⟳ settling on-chain…" : settled ? "✓ auction settled!" : "Settle auction"}
           </button>
           {settled && (
-            <div style={{ marginTop: 12, padding: "12px 16px", background: "rgba(100,220,120,0.06)", border: "1px solid rgba(100,220,120,0.15)", borderRadius: 10, fontSize: 13, color: "#64dc78" }}>
-              ✓ Auction settled · License NFT minted · Seller paid · Losers refunded
+            <div style={{ marginTop: 12, padding: "16px", background: "rgba(100,220,120,0.06)", border: "1px solid rgba(100,220,120,0.15)", borderRadius: 10 }}>
+              <div style={{ fontSize: 13, color: "#64dc78", marginBottom: 8 }}>✓ Auction settled · License NFT minted · Seller paid · Losers refunded</div>
+              <CopyBox label="Transaction" value={settleTxHash} />
             </div>
           )}
         </div>
